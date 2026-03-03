@@ -27,6 +27,11 @@ app.get('/test-data', (req, res) => {
     res.sendFile(path.join(__dirname, 'test-data.html'));
 });
 
+// Serve test login page
+app.get('/test-login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'test-login.html'));
+});
+
 // Serve login page
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'login.html'));

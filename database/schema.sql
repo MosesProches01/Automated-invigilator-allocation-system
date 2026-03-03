@@ -104,7 +104,7 @@ INSERT OR IGNORE INTO roles (role_id, role_name) VALUES
 
 -- Insert default admin user (password: admin123)
 INSERT OR IGNORE INTO users (user_id, username, password, role) VALUES 
-(1, 'admin', '$2a$10$6nrgvoLtiARx5OeJt/L4XO4/AZ.b.seRsiVFDg0qBoZw9KdswHoIm', 'Examination Officer');
+(1, 'admin', '$2a$10$9iuQjnAzaQwsWUo.cJrAGe6NuY1h3nJLT9IlgCNyORlGDFBopvfNe', 'Examination Officer');
 
 -- Sample data for testing
 INSERT OR IGNORE INTO invigilators (invigilator_id, first_name, last_name, email, department, role_id, user_id) VALUES 
