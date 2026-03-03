@@ -10,17 +10,25 @@ let dashboardData = {
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Dashboard loading...');
+    
+    // Check authentication
     if (!isAuthenticated()) {
+        console.log('Not authenticated, redirecting to login');
         window.location.href = '/login';
         return;
     }
 
     const user = getCurrentUser();
+    console.log('Current user:', user);
+    
     if (user.role !== 'Examination Officer') {
+        console.log('Not an officer, redirecting to invigilator dashboard');
         window.location.href = '/invigilator-dashboard';
         return;
     }
 
+    console.log('Authentication passed, loading dashboard data');
     loadDashboardData();
     setupEventListeners();
 });
@@ -28,10 +36,22 @@ document.addEventListener('DOMContentLoaded', function() {
 // Setup event listeners
 function setupEventListeners() {
     // Session form
-    document.getElementById('sessionForm').addEventListener('submit', handleAddSession);
+    const sessionForm = document.getElementById('sessionForm');
+    if (sessionForm) {
+        sessionForm.addEventListener('submit', handleAddSession);
+    }
     
     // Invigilator form
-    document.getElementById('invigilatorForm').addEventListener('submit', handleAddInvigilator);
+    const invigilatorForm = document.getElementById('invigilatorForm');
+    if (invigilatorForm) {
+        invigilatorForm.addEventListener('submit', handleAddInvigilator);
+    }
+    
+    // Generate allocations button
+    const generateBtn = document.getElementById('generateAllocations');
+    if (generateBtn) {
+        generateBtn.addEventListener('click', generateAllAllocations);
+    }
 }
 
 // Load dashboard data
@@ -50,23 +70,44 @@ async function loadDashboardData() {
 
 // Load statistics
 async function loadStats() {
-    const response = await makeAuthenticatedRequest(`${API_BASE}/dashboard/stats`);
-    const stats = await response.json();
+    const response = await fetch(`${API_BASE}/test/sessions`);
+    const sessions = await response.json();
     
-    document.getElementById('totalSessions').textContent = stats.totalSessions;
-    document.getElementById('totalInvigilators').textContent = stats.totalInvigilators;
-    document.getElementById('allocatedSessions').textContent = stats.allocatedSessions;
-    document.getElementById('pendingSessions').textContent = stats.pendingSessions;
+    const invigilatorResponse = await fetch(`${API_BASE}/test/invigilators`);
+    const invigilators = await invigilatorResponse.json();
+    
+    const stats = {
+        totalSessions: sessions.length,
+        totalInvigilators: invigilators.length,
+        totalAllocations: 0,
+        pendingSessions: sessions.filter(s => s.status === 'scheduled').length
+    };
     
     dashboardData.stats = stats;
+    updateStatsDisplay(stats);
+}
+
+// Update statistics display
+function updateStatsDisplay(stats) {
+    const totalSessionsEl = document.getElementById('totalSessions');
+    const totalInvigilatorsEl = document.getElementById('totalInvigilators');
+    const totalAllocationsEl = document.getElementById('totalAllocations');
+    const pendingSessionsEl = document.getElementById('pendingSessions');
+    
+    if (totalSessionsEl) totalSessionsEl.textContent = stats.totalSessions;
+    if (totalInvigilatorsEl) totalInvigilatorsEl.textContent = stats.totalInvigilators;
+    if (totalAllocationsEl) totalAllocationsEl.textContent = stats.totalAllocations;
+    if (pendingSessionsEl) pendingSessionsEl.textContent = stats.pendingSessions;
 }
 
 // Load sessions
 async function loadSessions() {
-    const response = await makeAuthenticatedRequest(`${API_BASE}/sessions`);
+    const response = await fetch(`${API_BASE}/test/sessions`);
     const sessions = await response.json();
     
     const tbody = document.getElementById('sessionsTable');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     if (sessions.length === 0) {
@@ -93,7 +134,7 @@ function createSessionRow(session) {
         <td>${session.course_code} - ${session.course_name}</td>
         <td>${formatDate(session.exam_date)}</td>
         <td>${formatTime(session.start_time)} - ${formatTime(session.end_time)}</td>
-        <td>${session.room_name}</td>
+        <td>${session.room_name || 'N/A'}</td>
         <td>${statusBadge}</td>
         <td>${allocationsText}</td>
         <td>
@@ -107,10 +148,12 @@ function createSessionRow(session) {
 
 // Load invigilators
 async function loadInvigilators() {
-    const response = await makeAuthenticatedRequest(`${API_BASE}/invigilators`);
+    const response = await fetch(`${API_BASE}/test/invigilators`);
     const invigilators = await response.json();
     
     const tbody = document.getElementById('invigilatorsTable');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     if (invigilators.length === 0) {
@@ -134,205 +177,211 @@ function createInvigilatorRow(invigilator) {
         <td>${invigilator.first_name} ${invigilator.last_name}</td>
         <td>${invigilator.email}</td>
         <td>${invigilator.department}</td>
-        <td>${invigilator.role_name}</td>
+        <td>${getRoleName(invigilator.role_id)}</td>
         <td>${invigilator.current_workload}</td>
         <td>
-            <button class="btn btn-sm btn-primary" onclick="viewInvigilatorSchedule(${invigilator.invigilator_id})">Schedule</button>
+            <button class="btn btn-sm btn-primary" onclick="editInvigilator(${invigilator.invigilator_id})">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteInvigilator(${invigilator.invigilator_id})">Delete</button>
         </td>
     `;
     
     return row;
 }
 
-// Generate allocations
-async function generateAllocations() {
+// Get role name from ID
+function getRoleName(roleId) {
+    const roles = {
+        1: 'Senior Invigilator',
+        2: 'Assistant Invigilator'
+    };
+    return roles[roleId] || 'Unknown';
+}
+
+// Generate all allocations
+async function generateAllAllocations() {
     try {
         showLoading('Generating allocations...');
         
-        const response = await makeAuthenticatedRequest(`${API_BASE}/allocations/generate`, {
-            method: 'POST'
+        const response = await fetch(`${API_BASE}/allocations/generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
         });
         
-        const results = await response.json();
+        if (!response.ok) {
+            throw new Error('Failed to generate allocations');
+        }
+        
+        const result = await response.json();
         
         hideLoading();
-        showAllocationResults(results);
-        loadDashboardData(); // Refresh data
+        showSuccess(`Generated ${result.allocations.length} allocations successfully!`);
+        
+        // Reload data to show new allocations
+        await loadDashboardData();
         
     } catch (error) {
         hideLoading();
+        console.error('Error generating allocations:', error);
         showError('Failed to generate allocations: ' + error.message);
     }
 }
 
-// Show allocation results
-function showAllocationResults(results) {
-    const modal = document.getElementById('allocationResultsModal');
-    const resultsDiv = document.getElementById('allocationResults');
-    
-    let html = `
-        <div class="mb-20">
-            <p><strong>Total Sessions:</strong> ${results.total}</p>
-            <p><strong>Successfully Allocated:</strong> ${results.success.length}</p>
-            <p><strong>Failed:</strong> ${results.failed.length}</p>
-        </div>
-    `;
-    
-    if (results.success.length > 0) {
-        html += '<h4>Successfully Allocated:</h4><ul>';
-        results.success.forEach(success => {
-            html += `<li>Session ${success.sessionId}: ${success.allocations.length} invigilators assigned</li>`;
-        });
-        html += '</ul>';
-    }
-    
-    if (results.failed.length > 0) {
-        html += '<h4>Failed to Allocate:</h4><ul>';
-        results.failed.forEach(failed => {
-            html += `<li>Session ${failed.sessionId}: ${failed.reason}</li>`;
-        });
-        html += '</ul>';
-    }
-    
-    resultsDiv.innerHTML = html;
-    modal.style.display = 'block';
-}
-
-// Handle add session
-async function handleAddSession(e) {
-    e.preventDefault();
-    
-    const sessionData = {
-        course_code: document.getElementById('courseCode').value,
-        course_name: document.getElementById('courseName').value,
-        exam_date: document.getElementById('examDate').value,
-        start_time: document.getElementById('startTime').value,
-        end_time: document.getElementById('endTime').value,
-        room_id: parseInt(document.getElementById('roomName').value)
-    };
-    
+// Manual allocate for specific session
+async function manualAllocate(sessionId) {
     try {
-        const response = await makeAuthenticatedRequest(`${API_BASE}/sessions`, {
+        showLoading('Allocating invigilators...');
+        
+        const response = await fetch(`${API_BASE}/allocations/session/${sessionId}`, {
             method: 'POST',
-            body: JSON.stringify(sessionData)
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
         });
+        
+        if (!response.ok) {
+            throw new Error('Failed to allocate invigilators');
+        }
         
         const result = await response.json();
         
-        if (response.ok) {
-            closeModal('sessionModal');
-            showSuccess('Session added successfully');
-            loadSessions();
-            document.getElementById('sessionForm').reset();
-        } else {
-            showError(result.error);
-        }
+        hideLoading();
+        showSuccess(`Allocated ${result.allocations.length} invigilators successfully!`);
+        
+        // Reload sessions to show allocations
+        await loadSessions();
+        
     } catch (error) {
+        hideLoading();
+        console.error('Error allocating invigilators:', error);
+        showError('Failed to allocate invigilators: ' + error.message);
+    }
+}
+
+// View session details
+function viewSessionDetails(sessionId) {
+    const session = dashboardData.sessions.find(s => s.session_id === sessionId);
+    if (!session) return;
+    
+    // Show modal with session details
+    const modal = document.getElementById('sessionModal');
+    const modalContent = document.getElementById('modalContent');
+    
+    if (modal && modalContent) {
+        modalContent.innerHTML = `
+            <h3>Session Details</h3>
+            <p><strong>Course:</strong> ${session.course_code} - ${session.course_name}</p>
+            <p><strong>Date:</strong> ${formatDate(session.exam_date)}</p>
+            <p><strong>Time:</strong> ${formatTime(session.start_time)} - ${formatTime(session.end_time)}</p>
+            <p><strong>Room:</strong> ${session.room_name || 'N/A'}</p>
+            <p><strong>Status:</strong> ${session.status}</p>
+            <h4>Allocations</h4>
+            <div id="allocationsList">
+                ${session.allocations && session.allocations.length > 0 ? 
+                    session.allocations.map(a => `<p>${a.first_name} ${a.last_name} (${a.role_name})</p>`).join('') :
+                    '<p>No allocations yet</p>'
+                }
+            </div>
+        `;
+        
+        modal.style.display = 'block';
+    }
+}
+
+// Close modal
+function closeModal() {
+    const modal = document.getElementById('sessionModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Handle add session
+async function handleAddSession(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const sessionData = {
+        course_id: parseInt(formData.get('course_id')),
+        room_id: parseInt(formData.get('room_id')),
+        exam_date: formData.get('exam_date'),
+        start_time: formData.get('start_time'),
+        end_time: formData.get('end_time')
+    };
+    
+    try {
+        const response = await fetch(`${API_BASE}/sessions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify(sessionData)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to add session');
+        }
+        
+        showSuccess('Session added successfully!');
+        event.target.reset();
+        await loadSessions();
+        
+    } catch (error) {
+        console.error('Error adding session:', error);
         showError('Failed to add session: ' + error.message);
     }
 }
 
 // Handle add invigilator
-async function handleAddInvigilator(e) {
-    e.preventDefault();
+async function handleAddInvigilator(event) {
+    event.preventDefault();
     
+    const formData = new FormData(event.target);
     const invigilatorData = {
-        first_name: document.getElementById('firstName').value,
-        last_name: document.getElementById('lastName').value,
-        email: document.getElementById('email').value,
-        department: document.getElementById('department').value,
-        role_id: parseInt(document.getElementById('role').value)
+        first_name: formData.get('first_name'),
+        last_name: formData.get('last_name'),
+        email: formData.get('email'),
+        department: formData.get('department'),
+        role_id: parseInt(formData.get('role_id'))
     };
     
     try {
-        const response = await makeAuthenticatedRequest(`${API_BASE}/invigilators`, {
+        const response = await fetch(`${API_BASE}/invigilators`, {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
             body: JSON.stringify(invigilatorData)
         });
         
-        const result = await response.json();
-        
-        if (response.ok) {
-            closeModal('invigilatorModal');
-            showSuccess('Invigilator added successfully');
-            loadInvigilators();
-            document.getElementById('invigilatorForm').reset();
-        } else {
-            showError(result.error);
+        if (!response.ok) {
+            throw new Error('Failed to add invigilator');
         }
+        
+        showSuccess('Invigilator added successfully!');
+        event.target.reset();
+        await loadInvigilators();
+        
     } catch (error) {
+        console.error('Error adding invigilator:', error);
         showError('Failed to add invigilator: ' + error.message);
     }
 }
 
-// View session details
-async function viewSessionDetails(sessionId) {
-    try {
-        const response = await makeAuthenticatedRequest(`${API_BASE}/sessions/${sessionId}`);
-        const session = await response.json();
-        
-        let details = `
-            <h3>Session Details</h3>
-            <p><strong>Course:</strong> ${session.course_code} - ${session.course_name}</p>
-            <p><strong>Date:</strong> ${formatDate(session.exam_date)}</p>
-            <p><strong>Time:</strong> ${formatTime(session.start_time)} - ${formatTime(session.end_time)}</p>
-            <p><strong>Room:</strong> ${session.room_name} (Capacity: ${session.capacity})</p>
-        `;
-        
-        if (session.allocations && session.allocations.length > 0) {
-            details += '<h4>Allocated Invigilators:</h4><ul>';
-            session.allocations.forEach(allocation => {
-                const chiefBadge = allocation.is_chief ? ' (Chief)' : '';
-                details += `<li>${allocation.first_name} ${allocation.last_name} - ${allocation.role_name}${chiefBadge}</li>`;
-            });
-            details += '</ul>';
-        } else {
-            details += '<p><strong>No invigilators allocated yet</strong></p>';
-        }
-        
-        alert(details);
-    } catch (error) {
-        showError('Failed to load session details: ' + error.message);
+// Placeholder functions for edit/delete
+function editInvigilator(id) {
+    showInfo('Edit invigilator functionality coming soon!');
+}
+
+function deleteInvigilator(id) {
+    if (confirm('Are you sure you want to delete this invigilator?')) {
+        showInfo('Delete invigilator functionality coming soon!');
     }
-}
-
-// View invigilator schedule
-async function viewInvigilatorSchedule(invigilatorId) {
-    try {
-        const response = await makeAuthenticatedRequest(`${API_BASE}/invigilators/${invigilatorId}/schedule`);
-        const schedule = await response.json();
-        
-        const invigilator = dashboardData.invigilators.find(i => i.invigilator_id === invigilatorId);
-        
-        let scheduleText = `Schedule for ${invigilator.first_name} ${invigilator.last_name}:\n\n`;
-        
-        if (schedule.length === 0) {
-            scheduleText += 'No sessions assigned';
-        } else {
-            schedule.forEach(session => {
-                scheduleText += `${formatDate(session.exam_date)}: ${session.course_code} - ${session.course_name}\n`;
-                scheduleText += `Time: ${formatTime(session.start_time)} - ${formatTime(session.end_time)}\n`;
-                scheduleText += `Room: ${session.room_name}\n`;
-                if (session.is_chief) scheduleText += 'Role: Chief Invigilator\n';
-                scheduleText += '\n';
-            });
-        }
-        
-        alert(scheduleText);
-    } catch (error) {
-        showError('Failed to load schedule: ' + error.message);
-    }
-}
-
-// Manual allocation (placeholder)
-function manualAllocate(sessionId) {
-    alert('Manual allocation feature would allow you to select specific invigilators for this session.');
-}
-
-// Refresh data
-function refreshData() {
-    loadDashboardData();
-    showSuccess('Data refreshed successfully');
 }
 
 // Utility functions
@@ -347,71 +396,88 @@ function formatTime(timeString) {
 
 function getStatusBadge(status) {
     const badges = {
-        'scheduled': '<span class="badge badge-info">Scheduled</span>',
+        'scheduled': '<span class="badge badge-warning">Scheduled</span>',
+        'in_progress': '<span class="badge badge-info">In Progress</span>',
         'completed': '<span class="badge badge-success">Completed</span>',
         'cancelled': '<span class="badge badge-danger">Cancelled</span>'
     };
-    return badges[status] || '<span class="badge badge-warning">Unknown</span>';
+    return badges[status] || '<span class="badge badge-secondary">Unknown</span>';
 }
 
-// Modal functions
-function showAddSessionModal() {
-    document.getElementById('sessionModal').style.display = 'block';
-}
-
-function showAddInvigilatorModal() {
-    document.getElementById('invigilatorModal').style.display = 'block';
-}
-
-function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
-}
-
-// Close modal when clicking outside
-window.onclick = function(event) {
-    if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
-    }
-}
-
-// Loading and message functions
 function showLoading(message = 'Loading...') {
-    // Create or update loading overlay
-    let loading = document.getElementById('loadingOverlay');
-    if (!loading) {
-        loading = document.createElement('div');
-        loading.id = 'loadingOverlay';
-        loading.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            color: white;
-            font-size: 18px;
-        `;
-        document.body.appendChild(loading);
+    const loadingDiv = document.getElementById('loading');
+    if (loadingDiv) {
+        loadingDiv.textContent = message;
+        loadingDiv.style.display = 'block';
     }
-    loading.innerHTML = `<div><div class="spinner"></div><p>${message}</p></div>`;
-    loading.style.display = 'flex';
 }
 
 function hideLoading() {
-    const loading = document.getElementById('loadingOverlay');
-    if (loading) {
-        loading.style.display = 'none';
+    const loadingDiv = document.getElementById('loading');
+    if (loadingDiv) {
+        loadingDiv.style.display = 'none';
+    }
+}
+
+// Include auth functions (these should be available from auth.js)
+function getCurrentUser() {
+    const userStr = localStorage.getItem('currentUser');
+    return userStr ? JSON.parse(userStr) : null;
+}
+
+function isAuthenticated() {
+    const token = localStorage.getItem('authToken');
+    const user = getCurrentUser();
+    return !!(token && user);
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('error');
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
     }
 }
 
 function showSuccess(message) {
-    alert('Success: ' + message);
+    const successDiv = document.getElementById('success');
+    if (successDiv) {
+        successDiv.textContent = message;
+        successDiv.style.display = 'block';
+        setTimeout(() => {
+            successDiv.style.display = 'none';
+        }, 3000);
+    }
 }
 
-function showError(message) {
-    alert('Error: ' + message);
+function showInfo(message) {
+    alert(message); // Simple fallback for now
+}
+
+// Quick action functions
+function generateAllocations() {
+    generateAllAllocations();
+}
+
+function showAddSessionModal() {
+    showInfo('Add Session modal functionality coming soon!');
+}
+
+function showAddInvigilatorModal() {
+    showInfo('Add Invigilator modal functionality coming soon!');
+}
+
+function refreshData() {
+    loadDashboardData();
+    showSuccess('Data refreshed successfully!');
+}
+
+// Logout function
+function logout() {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+    window.location.href = '/login';
 }

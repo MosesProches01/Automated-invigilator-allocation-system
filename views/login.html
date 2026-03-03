@@ -27,5 +27,56 @@
     </div>
 
     <script src="/js/auth.js"></script>
+    <script>
+        // Handle login form submission
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            try {
+                // Show loading state
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.textContent = 'Logging in...';
+                submitBtn.disabled = true;
+                
+                // Attempt login
+                await login(username, password);
+                
+                // Redirect based on user role
+                const user = getCurrentUser();
+                if (user.role === 'Examination Officer') {
+                    window.location.href = '/officer-dashboard';
+                } else if (user.role === 'Senior Invigilator' || user.role === 'Assistant Invigilator') {
+                    window.location.href = '/invigilator-dashboard';
+                } else {
+                    window.location.href = '/officer-dashboard'; // Default fallback
+                }
+                
+            } catch (error) {
+                // Show error message
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+                
+                // Reset button state
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+        
+        // Check if user is already logged in
+        if (isAuthenticated()) {
+            const user = getCurrentUser();
+            if (user.role === 'Examination Officer') {
+                window.location.href = '/officer-dashboard';
+            } else {
+                window.location.href = '/invigilator-dashboard';
+            }
+        }
+    </script>
 </body>
 </html>

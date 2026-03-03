@@ -32,6 +32,16 @@ app.get('/test-login', (req, res) => {
     res.sendFile(path.join(__dirname, 'test-login.html'));
 });
 
+// Serve debug login page
+app.get('/debug-login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'debug-login.html'));
+});
+
+// Serve debug allocation page
+app.get('/debug-allocation', (req, res) => {
+    res.sendFile(path.join(__dirname, 'debug-allocation.html'));
+});
+
 // Serve login page
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'login.html'));

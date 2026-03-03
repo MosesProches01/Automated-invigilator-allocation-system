@@ -61,7 +61,7 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public/ - This should NOT be ignored as it contains our CSS and JS files
 
 # Storybook build outputs
 .out

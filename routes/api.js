@@ -183,4 +183,56 @@ router.get('/dashboard/stats', authenticateToken, async (req, res) => {
     }
 });
 
+// Generate allocations for all sessions
+router.post('/allocations/generate', authenticateToken, async (req, res) => {
+    try {
+        const AllocationEngine = require('../services/AllocationEngine');
+        const allocationEngine = new AllocationEngine();
+        
+        const result = await allocationEngine.generateAllAllocations();
+        
+        console.log('Allocation result:', result);
+        
+        res.json({ 
+            message: 'Allocations generated successfully',
+            total: result.total,
+            success: result.success.length,
+            failed: result.failed.length,
+            allocations: result.success 
+        });
+    } catch (error) {
+        console.error('Allocation API error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Generate allocations for specific session
+router.post('/allocations/session/:sessionId', authenticateToken, async (req, res) => {
+    try {
+        const AllocationEngine = require('../services/AllocationEngine');
+        const allocationEngine = new AllocationEngine();
+        
+        const allocations = await allocationEngine.allocateForSession(req.params.sessionId);
+        
+        res.json({ 
+            message: 'Session allocations generated successfully',
+            allocations: allocations 
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get allocations for a session
+router.get('/allocations/session/:sessionId', authenticateToken, async (req, res) => {
+    try {
+        const Allocation = require('../models/Allocation');
+        const allocations = await Allocation.getBySession(req.params.sessionId);
+        
+        res.json(allocations);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

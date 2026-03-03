@@ -4,11 +4,13 @@ const path = require('path');
 class Database {
     constructor() {
         const dbPath = path.join(__dirname, '../database/data/invigilator_system.db');
-        this.db = new sqlite3.Database(dbPath, (err) => {
+        this.db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
             if (err) {
                 console.error('Error opening database:', err.message);
             } else {
                 console.log('Connected to SQLite database.');
+                // Set busy timeout to 30 seconds
+                this.db.configure("busyTimeout", 30000);
             }
         });
     }
