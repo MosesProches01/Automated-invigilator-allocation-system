@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invigilator Dashboard - Invigilator Allocation System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>Invigilator Dashboard</h1>
+            <nav>
+                <ul>
+                    <li><a href="#" onclick="logout()">Logout</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Welcome Card -->
+        <div class="card">
+            <h3>Welcome, <span id="invigilatorName">Invigilator</span></h3>
+            <p>View your assigned examination sessions and manage your responsibilities.</p>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>Total Assignments</h3>
+                <div class="stat-value" id="totalAssignments">-</div>
+                <div class="stat-label">This Month</div>
+            </div>
+            <div class="card">
+                <h3>Upcoming Sessions</h3>
+                <div class="stat-value" id="upcomingSessions">-</div>
+                <div class="stat-label">Next 7 Days</div>
+            </div>
+            <div class="card">
+                <h3>Chief Invigilator</h3>
+                <div class="stat-value" id="chiefCount">-</div>
+                <div class="stat-label">Sessions Leading</div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="card">
+            <h3>Quick Actions</h3>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn btn-warning" onclick="showEmergencyModal()">Report Emergency</button>
+                <button class="btn btn-danger" onclick="showIncidentModal()">Report Incident</button>
+                <button class="btn btn-success" onclick="showReportModal()">Submit Session Report</button>
+                <button class="btn btn-secondary" onclick="refreshData()">Refresh Data</button>
+            </div>
+        </div>
+
+        <!-- My Schedule Table -->
+        <div class="table-container">
+            <h3 style="padding: 20px;">My Examination Schedule</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Course</th>
+                        <th>Room</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="scheduleTable">
+                    <tr>
+                        <td colspan="7" class="text-center">Loading schedule...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Emergency Request Modal -->
+    <div id="emergencyModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('emergencyModal')">&times;</span>
+            <h2>Report Emergency Request</h2>
+            <form id="emergencyForm">
+                <div class="form-group">
+                    <label for="emergencySession">Select Session</label>
+                    <select id="emergencySession" class="form-control" required>
+                        <option value="">Select Session</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="emergencyType">Emergency Type</label>
+                    <select id="emergencyType" class="form-control" required>
+                        <option value="">Select Type</option>
+                        <option value="medical">Medical Emergency</option>
+                        <option value="technical">Technical Issue</option>
+                        <option value="security">Security Concern</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="emergencyDescription">Description</label>
+                    <textarea id="emergencyDescription" class="form-control" rows="4" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-warning">Submit Emergency Request</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Incident Report Modal -->
+    <div id="incidentModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('incidentModal')">&times;</span>
+            <h2>Report Incident</h2>
+            <form id="incidentForm">
+                <div class="form-group">
+                    <label for="incidentSession">Select Session</label>
+                    <select id="incidentSession" class="form-control" required>
+                        <option value="">Select Session</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="incidentType">Incident Type</label>
+                    <select id="incidentType" class="form-control" required>
+                        <option value="">Select Type</option>
+                        <option value="cheating">Cheating</option>
+                        <option value="disruption">Disruption</option>
+                        <option value="misconduct">Misconduct</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="incidentDescription">Description</label>
+                    <textarea id="incidentDescription" class="form-control" rows="4" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-danger">Report Incident</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Session Report Modal -->
+    <div id="reportModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('reportModal')">&times;</span>
+            <h2>Submit Session Report</h2>
+            <form id="reportForm">
+                <div class="form-group">
+                    <label for="reportSession">Select Session</label>
+                    <select id="reportSession" class="form-control" required>
+                        <option value="">Select Session</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="studentCount">Number of Students</label>
+                    <input type="number" id="studentCount" class="form-control" required min="0">
+                </div>
+                <div class="form-group">
+                    <label for="incidentsOccurred">Incidents Occurred</label>
+                    <input type="number" id="incidentsOccurred" class="form-control" required min="0">
+                </div>
+                <div class="form-group">
+                    <label for="reportText">Report Details</label>
+                    <textarea id="reportText" class="form-control" rows="6" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-success">Submit Report</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/invigilator-dashboard.js"></script>
+</body>
+</html>

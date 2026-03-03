@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Test - Invigilator System</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; background: #f2f2f7; }
+        .card { background: rgba(255,255,255,0.8); padding: 20px; border-radius: 12px; margin: 10px 0; }
+        .error { color: #ff3b30; }
+        .success { color: #34c759; }
+    </style>
+</head>
+<body>
+    <h1>Database Data Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testData() {
+            const results = document.getElementById('results');
+            
+            try {
+                // Test invigilators (public endpoint)
+                const invigilatorResponse = await fetch('/api/test/invigilators');
+                const invigilators = await invigilatorResponse.json();
+                
+                results.innerHTML += `
+                    <div class="card">
+                        <h3>✅ Invigilators (${invigilators.length})</h3>
+                        <pre>${JSON.stringify(invigilators, null, 2)}</pre>
+                    </div>
+                `;
+                
+                // Test sessions (public endpoint)
+                const sessionResponse = await fetch('/api/test/sessions');
+                const sessions = await sessionResponse.json();
+                
+                results.innerHTML += `
+                    <div class="card">
+                        <h3>✅ Sessions (${sessions.length})</h3>
+                        <pre>${JSON.stringify(sessions, null, 2)}</pre>
+                    </div>
+                `;
+                
+            } catch (error) {
+                results.innerHTML += `
+                    <div class="card error">
+                        <h3>❌ Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        testData();
+    </script>
+</body>
+</html>
